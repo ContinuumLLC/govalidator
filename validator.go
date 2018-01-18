@@ -776,14 +776,14 @@ func IsIn(str string, params ...string) bool {
 func checkRequired(v reflect.Value, t reflect.StructField, options tagOptionsMap) (bool, error) {
 	if requiredOption, isRequired := options["required"]; isRequired {
 		if len(requiredOption) > 0 {
-			return true, Error{t.Name, fmt.Errorf(requiredOption), true}
+			return false, Error{t.Name, fmt.Errorf(requiredOption), true}
 		}
-		return true, Error{t.Name, fmt.Errorf("non zero value required"), false}
+		return false, Error{t.Name, fmt.Errorf("non zero value required"), false}
 	} else if _, isOptional := options["optional"]; fieldsRequiredByDefault && !isOptional {
-		return true, Error{t.Name, fmt.Errorf("All fields are required to at least have one validation defined"), false}
+		return false, Error{t.Name, fmt.Errorf("All fields are required to at least have one validation defined"), false}
 	}
 	// not required and empty is valid
-	return false, nil
+	return true, nil
 }
 
 func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options tagOptionsMap) (isValid bool, resultErr error) {
@@ -810,10 +810,6 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		options = parseTagIntoMap(tag)
 	}
 
-	if required, err := checkRequired(v, t, options); required && isEmptyValue(v) {
-		return false, err
-	}
-
 	var customTypeErrors Errors
 	for validatorName, customErrorMessage := range options {
 		if validatefunc, ok := CustomTypeTagMap.Get(validatorName); ok {
@@ -831,6 +827,10 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 
 	if len(customTypeErrors.Errors()) > 0 {
 		return false, customTypeErrors
+	}
+
+	if isEmptyValue(v) {
+		return checkRequired(v, t, options)
 	}
 
 	if isRootType {
