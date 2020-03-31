@@ -1232,15 +1232,6 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		options = parseTagIntoMap(tag)
 	}
 
-	if !isFieldSet(v) {
-		// an empty value is not validated, check only required
-		isValid, resultErr = checkRequired(v, t, options)
-		for key := range options {
-			delete(options, key)
-		}
-		return isValid, resultErr
-	}
-
 	var customTypeErrors Errors
 	optionsOrder := options.orderedKeys()
 	for _, validatorName := range optionsOrder {
@@ -1260,6 +1251,10 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 
 	if len(customTypeErrors.Errors()) > 0 {
 		return false, customTypeErrors
+	}
+
+	if isEmptyValue(v) {
+		return checkRequired(v, t, options)
 	}
 
 	if isRootType {
@@ -1408,7 +1403,7 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 		sv = v.MapKeys()
 		sort.Sort(sv)
 		result := true
-		for i, k := range sv {
+		for _, k := range sv {
 			var resultItem bool
 			var err error
 			if v.MapIndex(k).Kind() != reflect.Struct {
@@ -1419,7 +1414,6 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 			} else {
 				resultItem, err = ValidateStruct(v.MapIndex(k).Interface())
 				if err != nil {
-					err = PrependPathToErrors(err, t.Name+"."+sv[i].Interface().(string))
 					return false, err
 				}
 			}
@@ -1463,6 +1457,27 @@ func typeCheck(v reflect.Value, t reflect.StructField, o reflect.Value, options 
 	default:
 		return false, &UnsupportedTypeError{v.Type()}
 	}
+}
+
+func isEmptyValue(v reflect.Value) bool {
+	switch v.Kind() {
+	case reflect.String, reflect.Array:
+		return v.Len() == 0
+	case reflect.Map, reflect.Slice:
+		return v.Len() == 0 || v.IsNil()
+	case reflect.Bool:
+		return !v.Bool()
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return v.Int() == 0
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
+		return v.Uint() == 0
+	case reflect.Float32, reflect.Float64:
+		return v.Float() == 0
+	case reflect.Interface, reflect.Ptr:
+		return v.IsNil()
+	}
+
+	return reflect.DeepEqual(v.Interface(), reflect.Zero(v.Type()).Interface())
 }
 
 func stripParams(validatorString string) string {
