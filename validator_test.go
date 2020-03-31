@@ -3250,6 +3250,7 @@ type testByteMap map[byte]byte
 type testByteSlice []byte
 type testStringStringMap map[string]string
 type testStringIntMap map[string]int
+type testStringBoolMap map[string]bool
 
 func TestRequired(t *testing.T) {
 
@@ -3350,6 +3351,14 @@ func TestRequired(t *testing.T) {
 				TestIntMap testStringIntMap `valid:"required"`
 			}{
 				testStringIntMap{"test": 42},
+			},
+			true,
+		},
+		{
+			struct {
+				TestIntMap testStringBoolMap `valid:"required"`
+			}{
+				testStringBoolMap{"test": true},
 			},
 			true,
 		},
